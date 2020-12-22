@@ -1,0 +1,14 @@
+function insert(h)
+{
+g1 = cylinder(0.2,h,32);
+g2 = cylinder(0.1,h,32);
+g = g1.difference(g2);
+return g;
+}
+
+g1 = insert(0.2);
+g1.display();
+
+g2 = insert(0.4);
+g2.translateZ(1);
+g2.display();

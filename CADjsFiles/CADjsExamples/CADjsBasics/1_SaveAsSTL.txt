@@ -1,0 +1,6 @@
+g1 = cube(1);
+g1.display();
+g1.saveSTL();
+
+
+

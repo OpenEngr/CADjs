@@ -1,0 +1,29 @@
+function insert(h)
+{
+g1 = cylinder(0.2,h,16);
+g2 = cylinder(0.1,h,16);
+g = g1.difference(g2);
+return g;
+}
+
+// First union all the inserts
+height = 0.2;
+gInsert = insert(0.2);
+gInsert.translateX(1);
+
+gF = gInsert.clone();
+for (var i = 1; i < 8; i++){
+  gInsert.rotateY(45);//rotate by 45 degrees 
+  gF =gF.union(gInsert);
+}
+gF.translateY(1.5*height);
+
+//create the base 
+gOuter = cylinder(1.25,0.5,24);//base outer
+gInner = cylinder(.4,0.5,24);//base inner
+gBase = gOuter.difference(gInner);//base
+
+///final object
+g = gBase.union(gF);
+
+g.display();

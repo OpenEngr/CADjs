@@ -1,0 +1,6 @@
+baseRadius = 1;
+topRadius = 0.5;
+height = 1;
+nSeg = 16;//quality
+g1 = cone(baseRadius,topRadius,height,nSeg);
+g1.display();

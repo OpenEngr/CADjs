@@ -1,0 +1,5 @@
+centerRadius= 1;
+tubeRadius = 0.25;
+nSeg = 16;// quality
+g1 = torus(centerRadius,tubeRadius,nSeg);
+g1.display();

@@ -1,0 +1,7 @@
+textHeight = 1.0;
+textDepth = 0.2;
+g1 = textGeom("Hello",textHeight,textDepth );
+g1.display();
+
+g2 = cube(1);
+g2.display(true);//wireframe

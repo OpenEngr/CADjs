@@ -1,0 +1,6 @@
+g = cube(1);
+// Need to create clone for later display
+g1 = g.clone();
+g1.rotateX(45);
+g.display(true);//wireframe
+g1.display();

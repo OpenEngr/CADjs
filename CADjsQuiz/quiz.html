@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<meta charset="UTF-8"> 
+<html>
+	<head>
+		<title>Geometry Quiz</title>
+		<link rel="stylesheet" href="css/style.css">
+		<script src="http://code.jquery.com/jquery-latest.min.js"></script>
+		<script src="js/quiz.js"></script>
+		<style> 
+			img { width:100%;height:100%; } 
+			h2 {word-spacing: 72px;}
+			h3 {font-size: 20px;}
+		</style>
+	</head>
+	<body>
+		<div id="container">
+			<header>
+				<h1> Test Your Visual Thinking </h1>
+			</header>
+			<img src="./images/cube.png" alt="image" style="width:128px;height:128px"> 
+			<img src="./images/sphere.png" alt="image" style="width:128px;height:128px"> 
+			<img src="./images/cylinder.png" alt="image" style="width:128px;height:128px"> 
+			<img src="./images/cone.png" alt="image" style="width:128px;height:128px"> 
+			<img src="./images/torus.png" alt="image" style="width:128px;height:128px"> 
+			<img src="./images/rod.png" alt="image" style="width:128px;height:128px"> 
+			<h2> Cube  Sphere  Cylinder Cone  Torus Rod</h2>
+			
+			<div id ="results"></div>
+			<div class="questions">
+				<font color="black" size = "4">1. How do you create this?</font> <br>	<br>		
+				<img src="./images/cubeUnionSphere.png" alt="image" style="width:128px;height:128px"> 
+				<form name = "quizForm">
+					<input type="radio" name = "q1" value = "a" id = "q1a"> a. Cube + Cylinder<br>
+					<input type="radio" name = "q1" value = "b" id = "q1b"> b. Cube + Cube<br>
+					<input type="radio" name = "q1" value = "c" id = "q1c"> c. Cube + Sphere<br>
+					<input type="radio" name = "q1" value = "d" id = "q1d"> d. Sphere + Sphere<br>
+				</form><br>			
+			</div>
+				
+			<div class="questions"><br>
+				<form name = "quizForm">	
+					<font color="black" size = "4">2. How do you create this?</font> <br>	<br>		
+					<img src="./images/cubeUnionCylinder.png" alt="image" style="width:128px;height:128px">  <br>
+					<input type="radio" name = "q2" value = "a" id = "q2a"> a. Cube + Cylinder<br>
+					<input type="radio" name = "q2" value = "b" id = "q2b"> b. Cube + Cube<br>
+					<input type="radio" name = "q2" value = "c" id = "q2c"> c. Cylinder + Sphere<br>
+					<input type="radio" name = "q2" value = "d" id = "q2d"> d. Sphere + Sphere<br>
+				</form><br>			
+			</div>
+			
+			<div class="questions"><br>
+				<form name = "quizForm">	
+					<font color="black" size = "4">3. How do you create this?</font> <br>	<br>		
+					<img src="./images/sphereUnionConeUnionTorus.png" alt="image" style="width:128px;height:128px">  <br>
+					<input type="radio" name = "q3" value = "a" id = "q3a"> a. Cube + Cylinder + Torus<br>
+					<input type="radio" name = "q3" value = "b" id = "q3b"> b. Sphere + Torus + Cylinder<br>
+					<input type="radio" name = "q3" value = "c" id = "q3c"> c. Cylinder + Torus + Cone<br>
+					<input type="radio" name = "q3" value = "d" id = "q3d"> d. Sphere + Torus + Cone<br>
+				</form><br>			
+			</div>
+			
+			
+			<div class="questions"><br>
+				<form name = "quizForm">	
+					<font color="black" size = "4">4. How do you create this?</font> <br>	<br>		
+					<img src="./images/cubeMinusCylinder.png" alt="image" style="width:128px;height:128px">  <br>
+					<input type="radio" name = "q4" value = "a" id = "q4a"> a. Cube - Sphere<br>
+					<input type="radio" name = "q4" value = "b" id = "q4b"> b. Cube - Cylinder<br>
+					<input type="radio" name = "q4" value = "c" id = "q4c"> c. Cube + Cylinder<br>
+					<input type="radio" name = "q4" value = "d" id = "q4d"> d. Cylinder - Cube <br>
+				</form><br>			
+			</div>
+			
+			<div class="questions"><br>
+				<form name = "quizForm">	
+					<font color="black" size = "4">5. How do you create this?</font> <br>	<br>		
+					<img src="./images/cubeMinusSphere.png" alt="image" style="width:128px;height:128px">  <br>
+					<input type="radio" name = "q5" value = "a" id = "q5a"> a. Cube - Sphere<br>
+					<input type="radio" name = "q5" value = "b" id = "q5b"> b. Cube - Cylinder<br>
+					<input type="radio" name = "q5" value = "c" id = "q5c"> c. Cube + Cylinder<br>
+					<input type="radio" name = "q5" value = "d" id = "q5d"> d. Cylinder - Cube <br>
+				</form><br>			
+			</div>
+			
+			
+			<div class="questions"><br>
+				<form name = "quizForm">	
+					<font color="black" size = "4">6. How do you create this?</font> <br>	<br>		
+					<img src="./images/sphereMinusCube.png" alt="image" style="width:128px;height:128px">  <br>
+					<input type="radio" name = "q6" value = "a" id = "q6a"> a. Cube - Sphere<br>
+					<input type="radio" name = "q6" value = "b" id = "q6b"> b. Cube - Cylinder<br>
+					<input type="radio" name = "q6" value = "c" id = "q6c"> c. Sphere - Cube<br>
+					<input type="radio" name = "q6" value = "d" id = "q6d"> d. Sphere - Cylinder <br>
+				</form><br>			
+			</div>
+			
+			<div class="questions"><br>
+				<form name = "quizForm">	
+					<font color="black" size = "4">7. How do you create this?</font> <br>	<br>		
+					<img src="./images/cylinderMinusTorus.png" alt="image" style="width:128px;height:128px">  <br>
+					<input type="radio" name = "q7" value = "a" id = "q7a"> a. Cylinder - Torus<br>
+					<input type="radio" name = "q7" value = "b" id = "q7b"> b. Cylinder - Cone<br>
+					<input type="radio" name = "q7" value = "c" id = "q7c"> c. Torus - Cylinder<br>
+					<input type="radio" name = "q7" value = "d" id = "q7d"> d. Sphere - Cube <br>
+				</form><br>			
+			</div>
+			
+			<div class="questions"><br>
+				<form name = "quizForm">	
+					<font color="black" size = "4">8. How do you create this?</font> <br>	<br>		
+					<img src="./images/sphereUnionRodMinusCylinder.png" alt="image" style="width:128px;height:128px">  <br>
+					<input type="radio" name = "q8" value = "a" id = "q7a"> a. (Cylinder-Rod)+Sphere<br>
+					<input type="radio" name = "q8" value = "b" id = "q7b"> b. (Sphere+Rod)- Cylinder<br>
+					<input type="radio" name = "q8" value = "c" id = "q7c"> c. (Sphere-Cylinder)+ Rod<br>
+					<input type="radio" name = "q8" value = "d" id = "q7d"> d. (Cylinder+Rod)+Sphere <br>
+				</form><br>			
+			</div>
+			
+			<div class="questions"><br>
+				<form name = "quizForm">	
+					<font color="black" size = "4">9. How do you create this?</font> <br>	<br>		
+					<img src="./images/cubeIntersectSphere.png" alt="image" style="width:128px;height:128px">  <br>
+					<input type="radio" name = "q9" value = "a" id = "q7a"> a. Cube + Sphere<br>
+					<input type="radio" name = "q9" value = "b" id = "q7b"> b. Cube - Cylinder<br>
+					<input type="radio" name = "q9" value = "c" id = "q7c"> c. Cube - Sphere<br>
+					<input type="radio" name = "q9" value = "d" id = "q7d"> d. Cube * Sphere <br>
+				</form><br>			
+			</div>
+			
+			<div class="questions"><br>
+				<form name = "quizForm">	
+					<font color="black" size = "4">10. How do you create this?</font> <br>	<br>		
+					<img src="./images/cubeIntersectConeMinusRod.png" alt="image" style="width:128px;height:128px">  <br>
+					<input type="radio" name = "q10" value = "a" id = "q7a"> a. Cube + Cone - Rod<br>
+					<input type="radio" name = "q10" value = "b" id = "q7b"> b. (Cube - Cone) - Rod<br>
+					<input type="radio" name = "q10" value = "c" id = "q7c"> c. (Cube - Cone) * Rod<br>
+					<input type="radio" name = "q10" value = "d" id = "q7d"> d. (Cube * Cone) - Rod <br>
+				</form><br>			
+			</div>
+			
+			
+		<input type="button" id='next' value="Next">
+		<input type="button" id='restart' value="Restart">
+		<div id ="feedback"></div>
+		</div>
+		
+	</body>
+</html>

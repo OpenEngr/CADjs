@@ -1,0 +1,5 @@
+g = cube(1);
+g.display();
+//Press F5 to execute code
+//Open Controls for other options
+

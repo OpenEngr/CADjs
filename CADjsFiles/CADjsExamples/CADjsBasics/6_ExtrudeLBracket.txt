@@ -1,0 +1,9 @@
+s = start2DGeom(0,0);
+s.drawLine(1,0).drawLine(1,0.4).drawLine(0.5,0.4);
+s.drawArc(0.4,0.5,0.5,0.5,true);
+//xEnd,yEnd,xCenter,yCenter,Clockwise
+s.drawLine(0.4,1).drawLine(0,1).drawLine(0,0);
+s.display();//display 2D shape
+thickness = 0.1;
+g = extrudeShape(s,thickness).translateX(2);
+g.display();

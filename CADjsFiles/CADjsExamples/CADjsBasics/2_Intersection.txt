@@ -1,0 +1,5 @@
+nSeg = 24;
+g1 = cube(1);
+g2 = sphere(0.6,nSeg);
+g1.intersection(g2);
+g1.display();

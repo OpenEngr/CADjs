@@ -1,0 +1,4 @@
+g1 = cube(1);
+g2 = sphere(0.6,32);
+g3 = g1.union(g2);
+g3.display();

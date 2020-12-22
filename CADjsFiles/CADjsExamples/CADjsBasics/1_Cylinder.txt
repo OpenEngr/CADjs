@@ -1,0 +1,5 @@
+radius = 1.0;
+height = 2.0;
+nSeg = 16;//quality
+g = cylinder(radius,height,nSeg);
+g.display();

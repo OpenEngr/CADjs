@@ -1,0 +1,7 @@
+s =start2DGeom(0,0);//start point
+s.drawLine(1,0);//next point
+s.drawLine(0,1);//next point
+s.drawLine(0,0);//final point
+s.display();//display 2D shape
+g = extrudeShape(s,1);//thickness
+g.translateX(2).display();

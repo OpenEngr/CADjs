@@ -1,0 +1,7 @@
+g1 = cube(0.25,1,1);
+g = g1.clone();
+for (var i = 0;i < 10;i++) {
+  g1.rotateX(10);// rotate by 10 degrees each time
+  g = g.union(g1);
+}
+g.display();

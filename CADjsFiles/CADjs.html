@@ -1,0 +1,1744 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<title>CADjs</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link rel=stylesheet href="../css/base.css"/>
+</head>
+<body>
+<script src="../js/Three.js"></script>
+<script src="../js/Detector.js"></script>
+<script src="../js/OrbitControls.js"></script>
+<script src="../js/THREEx.KeyboardState.js"></script>
+<script src="../js/THREEx.FullScreen.js"></script>
+<script src="../js/THREEx.WindowResize.js"></script>
+<script src="../js/FileSaver.js"></script>
+<script src="../js/STLLoader.js"></script>
+<script src="../fonts/helvetiker_regular.typeface.js"></script>
+<script src='../js/dat.gui.js'></script>  
+<script src="../js/jquery-1.9.1.js"></script>
+<script src="../js/jquery-ui.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/1.3.0/math.min.js"></script>
+<script src="./ThreeCSG-master/ThreeCSG.js"></script>
+<script src="./CADjsbuttons.js"></script>
+<link rel=stylesheet href="../css/jquery-ui.css" />
+
+<script src="../swal/dist/sweetalert.min.js"></script>
+<link rel="stylesheet" type="text/css" href="../swal/dist/sweetalert.css">
+
+<!--loading codemirror library for erganomic editing box-->
+<script src="../codemirror/codemirror.js"></script> 
+<script src="../codemirror/javascript.js"></script>
+<script type="text/javascript" src="../codemirror/lint.js"></script>
+<script type="text/javascript" src="../codemirror/javascript-lint.js"></script>
+<script src="../codemirror/jshint.js"></script>
+<link rel="stylesheet" href="../codemirror/codemirror.css"/>
+<link rel="stylesheet" href="https://codemirror.net/addon/lint/lint.css">
+
+
+<script src="shortcut.js"></script>
+<script src="STLGeomUtils.js"></script>
+<div id="ThreeJS" style="position: absolute; left:500px; top:0px"></div>
+<div style="position: absolute; left: 0px; top: 0px; width:490px; height: 100%; border: 1px solid #000000;">
+
+
+<div id="infoButton" title="CADjs Info"  ></div>
+<div id="infoBox" title="CADjs">
+ 
+<font size="2" color="red"> Javascript driven CAD </font>
+<br>
+<font size="1" color="black">
+<ul>
+<li>No software installation necessary. </li>
+<li>JavaScript must be enabled. </li>
+<li>If CADjs is not functioning, see www.enable-javascript.com</li>
+<li>Accepts all Javascript syntax (for, while, if, Math.cos,arrays, strings, ...) </li>
+<li>Inspired by <a href="http://www.openscad.org" target="_blank">OpenSCAD</a>, powered by three.js, dat.gui and CSG.js </li>
+</ul>
+
+<br>
+</font>
+</div>
+
+<div id="helpButton" title="CADjs Manual"  ></div>
+<div id="helpBox" title="CADjs: User Accounts"></div>
+
+<!--<div id="powerpointButton" title="CADjs Power Point Slides and Examples"  ></div>-->
+
+
+<textarea id="mytextarea" style="position: relative; width:100%; height: 100%;"></textarea>
+<script type="text/javascript">
+	$(function () {
+		editor = CodeMirror.fromTextArea(document.getElementById('mytextarea'), 
+		{
+			mode: "javascript",
+			//smartIndent: true,
+			lineNumbers: true,
+			continueComments:"Enter",
+			//styleSelectedText:true,
+			theme: 'default',
+			lint: true,
+		    matchBrackets:true,
+			gutters:["CodeMirror-lint-markers"],
+			//lintWith:CodeMirror.javascriptValidator
+		});
+	})
+</script>
+
+<input id="STLInput" type="file" style="visibility:hidden" />
+<input id="CodeInput" type="file" style="visibility:hidden" />
+
+
+<script>
+var beepTimer=0;
+var loader = new THREE.STLLoader();
+var container, scene, camera, renderer, controls,axes,ambientLight,directionalLight;
+var G_Segments = 16;// default segments for cylinder, sphere and torus
+var keyboard = new THREEx.KeyboardState();
+init();
+animate();
+var angularSpeed = 0.2; 
+var lastTime = 0;
+var G_LengthScale = 0;
+var G_AxisLengthText = null;
+var G_savedText;//for recovery
+var G_geometriesDisplayed = [];
+var G_FilesLoaded = [];
+var G_nFilesLoaded = 0;
+var G_FileNameLoaded = null;
+var parameters;
+
+function showAxisLength(length)
+{
+	if (G_LengthScale == 0)
+	return;
+	if (G_AxisLengthText)
+	  document.body.removeChild(G_AxisLengthText);
+		
+	G_AxisLengthText = document.createElement('div');
+	G_AxisLengthText.style.position = 'absolute';
+	G_AxisLengthText.style.width = 500;
+	G_AxisLengthText.style.height = 30;
+	G_AxisLengthText.style.font = '14pt Calibri';
+	G_AxisLengthText.style.color = "blue";
+	G_AxisLengthText.innerHTML = "Axis length = " + length + ".<br> #Geoms displayed = " + G_geometriesDisplayed.length + ".<br> #Geoms loaded: " + G_FilesLoaded;
+	G_AxisLengthText.style.bottom ='20px';
+	G_AxisLengthText.style.left ='520px';
+	document.body.appendChild(G_AxisLengthText);
+}
+
+if (THREE.Geometry.prototype.info==null) THREE.Geometry.prototype.info = function()
+{
+	var displayVol, displayArea,nTriangles, nVertices;
+	var lx,ly,lz,lMax,lMin;
+	
+	nTriangles = this.faces.length;
+	nVertices = this.vertices.length;
+	
+	this.computeBoundingBox();
+	
+	lx = this.boundingBox.max.x-this.boundingBox.min.x;
+	ly = this.boundingBox.max.y-this.boundingBox.min.y;
+	lz = this.boundingBox.max.z-this.boundingBox.min.z;
+	
+	lMax  = Math.max(lx,Math.max(ly,lz)).toPrecision(3);
+	lMin  = Math.min(lx,Math.min(ly,lz)).toPrecision(3);
+	
+	displayArea = calculateArea(this).toPrecision(3);
+	displayVol = calculateVolume(this).toPrecision(3);
+
+	info = 'Triangles = ' + nTriangles ;
+	info += '\nVertices = ' + nVertices;
+	info += '\nMaxLength = ' + lMax ;
+	info += '\nMinLength = ' + lMin;
+	info += '\nArea = ' + displayArea;
+	info += '\nVolume = ' + displayVol;
+	
+	swal({	title: "Object info:",
+		text: info,
+		type: "info", showCancelButton: false,
+		confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+		closeOnConfirm: false
+	});
+}
+
+function enableTab(id) {
+    var el = document.getElementById(id);
+	if (el == null) return;
+    el.onkeydown = function(e) {
+        if (e.keyCode === 9) { // tab was pressed
+            // get caret position/selection
+            var val = this.value,
+                start = this.selectionStart,
+                end = this.selectionEnd;
+            // set textarea value to: text before caret + tab + text after caret
+            this.value = val.substring(0, start) + '\t' + val.substring(end);
+            // put caret at right position again
+            this.selectionStart = this.selectionEnd = start + 1;
+            // prevent the focus lose
+            return false;
+        }
+    };
+}
+
+function setDefaultSegments(seg)
+{
+	seg = seg || 16;
+	G_Segments = Math.min(seg,64);
+}
+function cube(a,b,c)
+{
+	a = a || 100;
+	b = b || a;
+	c = c || b;
+	geom = new THREE.CubeGeometry( a, b, c );
+	lScale  = Math.max(Math.max(Math.max(a,b),c),G_LengthScale);
+	setAxisLength(lScale);
+	return geom;
+}
+function sphere(r,seg)
+{
+	r = r || 100;
+	seg = seg || G_Segments;
+	seg = Math.min(seg,64);
+
+	geom = new THREE.SphereGeometry( r,seg,seg );
+	lScale  = Math.max(r,G_LengthScale);
+	setAxisLength(lScale);
+	return geom;
+}
+function cylinder(r,h,seg)
+{
+	r = r || 100;
+	h = h || r;
+	seg = seg || G_Segments;
+
+	seg = Math.min(seg,64);
+	geom = new THREE.CylinderGeometry( r,r,h,seg,seg );
+	
+	lScale  = Math.max(h,Math.max(r,G_LengthScale));
+	setAxisLength(lScale);
+	
+	return geom;
+}
+function cone(r1,r2,h,seg)
+{
+	r1 = r1 || 100;
+	r2 = r2 || 0.5*r1;
+	if (r2 == 0)
+	  r2 = 0.001*r1;
+	h = h || r1;
+	seg = seg || G_Segments;
+	seg = Math.min(seg,64);
+	geom = new THREE.CylinderGeometry( r2,r1,h,seg,seg );
+	return geom;
+}
+function torus(centerRadius,tubeRadius,seg)
+{           
+             
+	centerRadius = centerRadius || 100;
+	tubeRadius = tubeRadius || (centerRadius/4.0);
+	seg = seg || G_Segments;
+	seg = Math.min(seg,48);
+	var geom = new THREE.TorusGeometry( centerRadius, tubeRadius, seg, 2*seg );
+	return geom;
+}
+function textGeom(textString,textHeight,textDepth)
+{
+	if (textString == null)
+        textString = 'CADjs';
+        
+    textHeight = textHeight || 25;
+	textDepth = textDepth || (textHeight/5.0);
+    var parameters = {
+        size: textHeight,
+        height: textDepth,
+		curveSegments: 2,
+    };
+ 
+    var geom = new THREE.TextGeometry(textString,parameters);
+    return geom;
+}
+function textgeom(textString,textHeight,textDepth)
+{
+	return textGeom(textString,textHeight,textDepth);
+}
+
+function axesoff()
+{
+	scene.remove(axes);
+}
+function axeson()
+{
+	scene.add(axes);
+}
+function axesOff()
+{
+	scene.remove(axes);
+}
+function axesOn()
+{
+	scene.add(axes);
+}
+function plainBeep() {
+    var snd = new Audio("data:audio/wav;base64,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qJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRzx5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAAAA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfMakeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTTdNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZSmqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUzrO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yfK6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpoiDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTIsLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSIRobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU=");  
+    snd.play();
+}
+
+function resetBeeper()
+{
+	beepTimer = 0;
+}
+function beep()
+{
+    beepTimer = beepTimer+ 1000;
+    window.setTimeout(plainBeep, beepTimer);	
+    if (beepTimer > 20000)
+    	beepTimer  = 0;// avoid overaccumulation
+}
+function start2DGeom(x,y)
+{
+	 var shape = new THREE.Shape();
+	 x = x || 0;
+	 y = y || 0;
+	 shape.moveTo(x,y);
+	 return shape;
+}
+function start2dgeom(x,y)
+{
+	return start2DGeom(x,y);
+}
+if (THREE.Shape.prototype.drawLine==null) THREE.Shape.prototype.drawLine= function(x,y)
+{
+// this should be obsolete since "drawLine" is misleading, instead use "addLine"
+	return this.addLine(x,y);
+}
+
+if (THREE.Shape.prototype.addLine==null) THREE.Shape.prototype.addLine= function(x,y)
+{
+	this.lineTo(x,y);
+	return this;
+}
+
+if (THREE.Shape.prototype.getPoints==null) THREE.Shape.prototype.getPoints= function()
+{
+	
+	var result = this.extractAllPoints();
+	var shape = result.shape;
+	var holes = result.holes;//neglected for now
+	var nPts = shape.length;
+	var pts = [];
+	for (var i = 0; i < nPts; i++) 
+	   pts.push([shape[i].x,shape[i].y]);
+	
+	return pts;
+}
+
+if (THREE.Shape.prototype.rotateZ==null) THREE.Shape.prototype.rotateZ = function(angleInDegrees)
+{
+	angleInDegrees = angleInDegrees || 0;
+	var result = this.extractAllPoints();
+	var shape = result.shape;
+	var holes = result.holes;//neglected for now
+	var nPts = shape.length;
+	var pts = [];
+	var x, y,t;
+	for (var i = 0; i < nPts; i++) {
+		x = shape[i].x;
+		y = shape[i].y;
+		t = angleInDegrees*Math.PI/180;
+		pts.push([x*Math.cos(t)-y*Math.sin(t),x*Math.sin(t) + y*Math.cos(t) ]);
+	}
+	return polygon(pts);
+}
+
+if (THREE.Shape.prototype.translate==null) THREE.Shape.prototype.translate = function(dx,dy)
+{
+	dx = dx || 0;
+	dy = dy || 0;
+	var result = this.extractAllPoints();
+	var shape = result.shape;
+	var holes = result.holes;//neglected for now
+	var nPts = shape.length;
+	var pts = [];
+	for (var i = 0; i < nPts; i++) {
+		pts.push([shape[i].x+dx,shape[i].y+dy]);
+	}
+	return polygon(pts);
+}
+if (THREE.Shape.prototype.translateX==null) THREE.Shape.prototype.translateX = function(dx)
+{
+	return this.translate(dx,0);
+}
+if (THREE.Shape.prototype.translateY==null) THREE.Shape.prototype.translateY = function(dy)
+{
+	return this.translate(0,dy);
+}
+if (THREE.Shape.prototype.mirrorY==null) THREE.Shape.prototype.mirrorY = function()
+{
+	var result = this.extractAllPoints();
+	var shape = result.shape;
+	var holes = result.holes;//neglected for now
+	var nPts = shape.length;
+	var pts = [];
+	var x,y;
+	for (var i = 0; i < nPts; i++) {
+	    x = shape[i].x;
+		y = shape[i].y;
+		pts.push([-x,y]);
+	}
+	 return polygon(pts);
+}
+
+if (THREE.Shape.prototype.mirrorX==null) THREE.Shape.prototype.mirrorX = function()
+{
+	var result = this.extractAllPoints();
+	var shape = result.shape;
+	var holes = result.holes;//neglected for now
+	var nPts = shape.length;
+	var pts = [];
+	var x,y;
+	for (var i = 0; i < nPts; i++) {
+	    x = shape[i].x;
+		y = shape[i].y;
+		pts.push([x,-y]);
+	}
+	 return polygon(pts);
+}
+
+if (THREE.Shape.prototype.union==null) THREE.Shape.prototype.union= function(shape2)
+{
+	
+	var pts1 = this.getPoints();
+	var pts2 = shape2.getPoints();
+	console.log(pts1);
+	var pts3 = polygonBoolean(pts1, pts2, 'or');
+	return polygon(pts3);
+}
+
+function setAxisLength(LengthScale )
+{
+	G_LengthScale = Math.max(G_LengthScale,LengthScale);
+	
+	if(G_LengthScale == 0) return;
+	G_LengthScale  = G_LengthScale.toPrecision(3);
+	if (axes) scene.remove(axes);
+	axes = buildAxes( 0.75*G_LengthScale );
+	if (parameters.axes == true)
+	   scene.add( axes );
+	showAxisLength(G_LengthScale );
+	
+	if (camera) scene.remove(camera);
+	
+  	camera.position.set(3*G_LengthScale,3*G_LengthScale,3*G_LengthScale);
+  	camera.up.set( 0, 0, 1 );
+	scene.add(camera);
+
+    controls.center = new THREE.Vector3(0,0,0);
+	controls.userPanSpeed = 0.05*LengthScale;
+	
+}
+function rect(length,height,radius)
+{
+	// returns a 2D rectangle(polyarc)
+	
+	radius = radius || 0;
+	
+	var L = length;
+	var H = height;
+	var R = Math.abs(radius);
+	
+	if (R == 0) {
+		var pts = [[-L/2,-H/2],[L/2,-H/2],[L/2,H/2],[-L/2,H/2]];
+		return polygon(pts);
+	}
+	
+	arc1 = [L/2,-H/2+R,L/2-R,-H/2+R,false];
+	arc2 = [L/2-R,H/2, L/2-R,H/2-R,false];
+	arc3 = [-L/2,H/2-R,-L/2+R,H/2-R,false];
+	arc4 = [-L/2+R,-H/2,-L/2+R,-H/2+R,false];
+	
+	var p;
+	p = polyarc([  [-L/2+R,-H/2],[L/2-R,-H/2],arc1,[L/2,H/2-R],arc2,[-L/2+R,H/2],arc3,[-L/2,-H/2+R],arc4 ]);
+	
+	return p;
+	
+}
+function polygon(arrayOfPoints)
+{
+	// returns a 2D shape (polygon) 
+	var x,y,lx,ly;
+	var shape = new THREE.Shape();
+	var nPts = arrayOfPoints.length;
+	x = arrayOfPoints[0][0];
+	y = arrayOfPoints[0][1];
+	shape.moveTo(x,y);
+	lx = Math.abs(x);
+	ly = Math.abs(y);
+	for (var i = 1; i < nPts; i++) {
+		if (typeof arrayOfPoints[i][0][0] == "undefined") {// line
+			x = arrayOfPoints[i][0];
+			y = arrayOfPoints[i][1];
+			shape.lineTo(x,y);
+		}
+		else {//spline
+			shape.addSpline(arrayOfPoints[i]);
+		}
+		lx = Math.max(lx,Math.abs(x));
+		ly = Math.max(ly,Math.abs(y));
+	}
+	lScale  = Math.max(lx,ly);
+	setAxisLength(lScale);
+	
+	return shape;
+}
+function polyarc(arrayOfPoints)
+{
+	// returns a 2D shape (polygon) 
+	var x,y,lx,ly,xc,yc,dir;
+	var shape = new THREE.Shape();
+	var nPts = arrayOfPoints.length;
+	x = arrayOfPoints[0][0];
+	y = arrayOfPoints[0][1];
+	shape.moveTo(x,y);
+	lx = Math.abs(x);
+	ly = Math.abs(y);
+	for (var i = 1; i <nPts;i++) {
+		x = arrayOfPoints[i][0];
+		y = arrayOfPoints[i][1];
+		if (arrayOfPoints[i].length == 2) // line
+			shape.lineTo(x,y);
+		else if (arrayOfPoints[i].length == 5) {//arc with end point, center point and direction
+			xc = arrayOfPoints[i][2];
+			yc = arrayOfPoints[i][3];
+			dir = arrayOfPoints[i][4];
+			shape.addArc(x,y,xc,yc,dir);
+		}
+		else {
+			swal({	title: "Incorrect polygon:",
+				text: "Your polygon has an incorrect or invalid point array.",
+				type: "error", showCancelButton: false,
+				confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+				closeOnConfirm: false
+			});
+		}
+			
+		lx = Math.max(lx,Math.abs(x));
+		ly = Math.max(ly,Math.abs(y));
+	}
+	lScale  = Math.max(lx,ly);
+	setAxisLength(1.*lScale);
+	
+	return shape;
+}
+function circle(radius,nSegments)
+{
+	// returns a circle 2D shape
+	nSegments = nSegments || Math.floor(0.75*G_Segments);
+	nSegments = Math.min(nSegments ,32);
+	
+	var arrayOfPts = [];
+	var deltaTheta = 2*Math.PI/nSegments;
+	for (var theta = 0; theta < 2*Math.PI; theta +=deltaTheta ){
+		arrayOfPts.push([radius*Math.cos(theta),radius*Math.sin(theta)]);
+	}
+	
+	return polygon(arrayOfPts);
+}
+function makeArray(tStart,tEnd,tStep)
+{
+	var x = [];
+	for (var t = tStart; t <= tEnd; t = t + tStep) 
+		x.push(t);
+
+	return x;
+}
+if (math.poly==null) math.poly = function(coeffArray,tArray)
+{
+	var x = [];
+	var x0,t0,t;
+	
+	for (var i = 0; i < tArray.length ; i++) {
+		x0 = 0.0;
+		t0 = 1.0;
+		t = tArray[i];
+		for (var j = 0; j < coeffArray.length; j++) {
+			x0 += coeffArray[j]*t0;
+			t
+			t0 = t0*t;
+		}
+		x.push(x0);
+	}
+	return x;
+}
+function plot2D(xArray,yArray,clr)
+{
+	if (!clr)clr = 'blue';
+	plot2d(xArray,yArray,clr);
+}
+function plot2d(xArray,yArray,clr)
+{
+// plots a 2d or 3d parametric curve
+	//console.log(xArray);
+	//console.log(yArray);
+	if (!clr)clr = 'blue';
+	
+	if (xArray.length != yArray.length){
+		swal({	title: "Incorrect plot:",
+			text: "The array lengths have to be the same in the plot.",
+			type: "error", showCancelButton: false,
+			confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+			closeOnConfirm: false
+		});
+		
+		return;
+	}
+	var geometry = new THREE.Geometry();
+	var material = new THREE.LineBasicMaterial({
+        	color: clr,
+        	linewidth: 6,
+    	})
+	nPts = xArray.length;
+	var lx,ly,lz,lScale;
+	lScale  = 0;
+	for (var i = 0; i < nPts; i++) {
+		geometry.vertices.push(new THREE.Vector3(xArray[i], yArray[i], 0));
+		lx = Math.max(Math.abs(xArray[i]));
+		ly = Math.max(Math.abs(yArray[i]));
+		lScale  = Math.max(Math.max(lx,ly),lScale);
+	}
+	var line = new THREE.Line(geometry, material);
+	setAxisLength(1.*lScale);
+	scene.add(line);
+}
+
+function scalarMultiply(arr, multiplier) {
+   for (var i = 0; i < arr.length; i++)
+   {
+      arr[i] *= multiplier;
+   }
+   return arr;
+}
+
+function plot3D(xArray,yArray,zArray,clr)
+{
+	if (!clr)clr = 'blue';
+	plot3d(xArray,yArray,zArray,clr);
+}
+function plot3d(xArray,yArray,zArray,clr)
+{
+	// plots a 3d parametric curve
+	//console.log(xArray);
+	//console.log(yArray);
+	if (!clr)clr = 'blue';
+	
+	if ((xArray.length != yArray.length)|| (xArray.length != zArray.length)) {
+		swal({	title: "Incorrect plot:",
+			text: "The array lengths have to be the same in the plot.",
+			type: "error", showCancelButton: false,
+			confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+			closeOnConfirm: true
+		});
+		return;
+	}
+	var geometry = new THREE.Geometry();
+	var material = new THREE.LineBasicMaterial({
+        	color: clr
+    	})
+	nPts = xArray.length;
+	var lx,ly,lz,lScale;
+	lScale = 0;
+	for (var i = 0; i < nPts; i++) {
+		geometry.vertices.push(new THREE.Vector3(xArray[i], yArray[i], zArray[i]));
+		lx = Math.max(Math.abs(xArray[i]));
+		ly = Math.max(Math.abs(yArray[i]));
+		lz = Math.max(Math.abs(zArray[i]));
+		lScale  = Math.max(Math.max(Math.max(lx,ly),lz),lScale);
+		
+	}
+	var line = new THREE.Line(geometry, material);
+	setAxisLength(1.*lScale);
+	scene.add(line);
+}
+if (THREE.Shape.prototype.addArc==null) THREE.Shape.prototype.addArc= function(x,y,xc,yc,aClockwise)
+{
+
+	
+	return this.drawArc(x,y,xc,yc,aClockwise);
+}
+
+if (THREE.Shape.prototype.drawArc==null) THREE.Shape.prototype.drawArc= function(x,y,xc,yc,aClockwise)
+{
+	// make obsolete
+	// draws an arc from current point to (x,y) with given center and direction
+	var aRadius,thetaStart,thetaEnd;
+	
+	aRadius = Math.sqrt( (xc-x)*(xc-x) + (yc-y)*(yc-y));
+	
+	//get the last point
+	var lastargs = this.actions[ this.actions.length - 1 ].args;
+	var xs = lastargs[ lastargs.length - 2 ];
+	var ys = lastargs[ lastargs.length - 1 ];	
+
+	var vecStart = new THREE.Vector2( xs-xc, ys-yc );
+	var vecEnd = new THREE.Vector2( x-xc, y-yc );
+	vecStart.normalize();
+	vecEnd.normalize();
+	thetaStart = Math.atan2(vecStart.y,vecStart.x);
+    	thetaEnd = Math.atan2(vecEnd.y,vecEnd.x);
+
+	//console.log (thetaStart + ' ' + thetaEnd + ' ' + aClockwise );
+    	if (aClockwise) {// cw
+        	if (thetaEnd > thetaStart) // not allowed
+            	   thetaEnd = thetaEnd - 2*Math.PI;
+        }
+    	else {// ccw
+        	if (thetaEnd < thetaStart) // not allowed
+            		thetaEnd = thetaEnd + 2*Math.PI;
+         }
+	/* not able to control the discretization in Three js arc.
+        so, using a series of lines
+        ax = xc - xs;//offset from current point
+	ay = yc - ys;
+	aClockwise  = true;// There is a bug in Three.js, not able to figure out, but this seems to fix the problem
+	this.arc( ax, ay, aRadius, thetaStart, thetaEnd, aClockwise );*/
+
+        var nSeg  = Math.ceil(G_Segments*Math.abs(thetaEnd-thetaStart)/Math.PI/2);
+        //nSeg = Math.max(nSeg,4);
+        for (var i = 1; i <= nSeg;i++) {
+           theta = thetaStart + (thetaEnd-thetaStart)*i/(nSeg);
+           x = xc + aRadius*Math.cos(theta);
+           y = yc + aRadius*Math.sin(theta);
+           this.lineTo(x,y);
+        }
+
+
+	return this;
+}
+if (THREE.Shape.prototype.drawSpline==null) THREE.Shape.prototype.drawSpline= function(ptArray)
+{
+	//make obsolete
+	return this.addSpline(ptArray);
+}
+if (THREE.Shape.prototype.addSpline==null) THREE.Shape.prototype.addSpline= function(ptArray)
+{
+	
+	var vectorArray = [],x,y,vec;
+	for (var i = 0; i < ptArray.length; i++) {
+	    x = ptArray[i][0];
+	   y = ptArray[i][1];
+	   vec = new THREE.Vector2( x, y );
+	   vectorArray.push(vec);
+	}
+	this.splineThru(vectorArray);
+	return this;
+}
+if (THREE.Shape.prototype.drawBezier==null) THREE.Shape.prototype.drawBezier= function(controlPts)
+{
+	//make obsolete
+	return this.addBezier(controlPts);
+}
+if (THREE.Shape.prototype.addBezier==null) THREE.Shape.prototype.addBezier= function(controlPts)
+{
+	var aCP1x, aCP1y, aCP2x, aCP2y, aX, aY;
+	
+	this.lineTo(controlPts[0][0],controlPts[0][1]);//first add a line
+	
+	aCP1x = controlPts[1][0];
+	aCP1y = controlPts[1][1];
+	aCP2x = controlPts[2][0];
+	aCP2y = controlPts[2][1];
+	aX = controlPts[3][0];
+	aY = controlPts[3][1];
+	this.bezierCurveTo(aCP1x, aCP1y, aCP2x, aCP2y, aX, aY);
+	return this;
+}
+function extrudeShape(shape2D,thickness)
+{
+    var options = {
+        amount: thickness,
+        bevelEnabled: false,
+        curveSegments: 16,
+        steps: 1
+    };
+    geom = new THREE.ExtrudeGeometry(shape2D, options);
+    return geom;
+}
+function revolveShape(shape,radius)
+{
+
+    radius = radius || 0;
+	
+	if (radius <= 0)
+		radius = 0.0000001*G_LengthScale;
+	var nPts = 10,x,y;
+	var pts =[],vec;
+
+	var seg = Math.floor(Math.min(G_Segments,64));
+	
+	seg = Math.max(seg,16);
+	nPts = seg;
+	
+	for (var i = 0; i < nPts; i++) {
+		var theta = 2*(Math.PI)*i/(nPts);
+		x = radius*Math.cos(theta);
+		y = radius*Math.sin(theta);
+		vec = new THREE.Vector3( x, y,  0 );
+		pts.push(vec);
+	}
+	
+	var spline = new THREE.ClosedSplineCurve3( pts);
+
+	
+	var extrudeSettings = {
+		steps			: seg,
+		bevelEnabled	: false,
+		extrudePath		: spline
+	};
+
+	shape = shape.rotateZ(-90);// we undo the ThreeJs effect before revolving
+	
+	var geom = new THREE.ExtrudeGeometry( shape, extrudeSettings );
+	geom.rotateX(90);
+	return geom;
+
+}
+function revolveShapeBetween(shape,radius,startAngle,endAngle)
+{
+	var nPts = 10,x,y;
+	var pts =[],vec;
+
+	var seg = Math.floor(Math.min(0.5*G_Segments,32))+2;
+	nPts = seg;
+	if (startAngle >= endAngle){
+		alert('End angle must be greater than start angle');
+		return;
+	}
+	if (endAngle > 360){
+		alert('End angle must be less than 360 degrees');
+		return;
+	}
+
+	startAngle = startAngle*Math.PI/180;
+	endAngle = endAngle*Math.PI/180;
+	
+	//to orient the cross section correctly, the first and last angles must be small
+	var deltaTheta = 2*Math.PI/180;
+	var theta;
+	for (var i = 0; i <= nPts; i++) {
+		if (i == 1)
+			theta = startAngle + deltaTheta;
+		else if (i == nPts-1)
+			theta = endAngle - deltaTheta;
+		else
+			theta = startAngle +  (endAngle-startAngle)*i/(nPts);
+		x = radius*Math.cos(theta);
+		y = radius*Math.sin(theta);
+		vec = new THREE.Vector3( x, y,  0 );
+		pts.push(vec);
+	}
+	
+	var spline = new THREE.SplineCurve3( pts);
+	var extrudeSettings = {
+		steps			: seg,
+		bevelEnabled	: false,
+		extrudePath		: spline
+	};
+	shape = shape.rotateZ(-90);// we undo the ThreeJs effect before revolving
+	
+	var geom = new THREE.ExtrudeGeometry( shape, extrudeSettings );
+	geom.rotateX(90);
+	return geom;
+
+}
+function sweepShapeAlongPath(shape,path)
+{
+	//path is an array of Vector3
+	var spline = new THREE.SplineCurve3( path);
+	var extrudeSettings = {
+		steps			: 200,
+		bevelEnabled	: false,
+		extrudePath		: spline
+	};
+	var geom = new THREE.ExtrudeGeometry( shape, extrudeSettings );
+	return geom;
+}
+function doBoundingBoxesOverlap(bBoxA,bBoxB)
+{
+	if (bBoxA.max.x < bBoxB.min.x) return false;
+	if (bBoxB.max.x < bBoxA.min.x) return false;
+	
+	if (bBoxA.max.y < bBoxB.min.y) return false;
+	if (bBoxB.max.y < bBoxA.min.y) return false;
+	
+	if (bBoxA.max.z < bBoxB.min.z) return false;
+	if (bBoxB.max.z < bBoxA.min.z) return false;
+	
+	return true;
+}
+
+function isBoxAContainedInBoxB(bBoxA,bBoxB)
+{
+	if ((bBoxA.max.x < bBoxB.max.x)  && 
+	    (bBoxA.min.x > bBoxB.min.x) &&
+	    (bBoxA.max.y < bBoxB.max.y)  && 
+	    (bBoxA.min.y > bBoxB.min.y) &&
+	    (bBoxA.max.z < bBoxB.max.z)  && 
+	    (bBoxA.min.z > bBoxB.min.z) )
+	    return true;
+	
+	
+	return false;
+}
+if (THREE.Geometry.prototype.intersection ==null) THREE.Geometry.prototype.intersection = function(geom2)
+{
+	if (!(geom2 instanceof THREE.Geometry)){
+		swal({	title: "object error:",
+			text: "Argument of intersection must be a geom object",
+			type: "error", showCancelButton: false,
+			confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+			closeOnConfirm: true
+		});
+		return;
+	}
+	// First perform operations on bounding boxes to save on computations
+	this.computeBoundingBox();
+	geom2.computeBoundingBox();
+	var bBoxA =  this.boundingBox;
+	var bBoxB = geom2.boundingBox;
+	// Test 1: If bounding boxes do not intersect, return empty geom
+	/*if (!doBoundingBoxesOverlap(bBoxA,bBoxB)){
+	    var emptyGeom = new THREE.Geometry();
+	    return emptyGeom ;
+	}*/
+
+
+	 var geom1_bsp = new ThreeBSP( this );
+	 var geom2_bsp = new ThreeBSP( geom2 );
+	 var result_bsp = geom1_bsp.intersect( geom2_bsp );
+	 matl = new THREE.MeshNormalMaterial( { color: 0x000088 } );
+	var result = result_bsp.toMesh( matl );
+	result.geometry.computeVertexNormals();
+	 return result.geometry;
+}
+
+if (THREE.Geometry.prototype.difference ==null) THREE.Geometry.prototype.difference = function(geom2)
+{
+	if (!(geom2 instanceof THREE.Geometry)){
+		swal({	title: "object error:",
+			text: "Argument of difference must be a geom object",
+			type: "error", showCancelButton: false,
+			confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+			closeOnConfirm: true
+		});
+		return;
+	}
+	// First perform operations on bounding boxes to save on computations
+	this.computeBoundingBox();
+	geom2.computeBoundingBox();
+	var bBoxA =  this.boundingBox;
+	var bBoxB = geom2.boundingBox;
+	
+	// Test 1: If bounding boxes do not intersect, return this geom
+	/*if (!doBoundingBoxesOverlap(bBoxA,bBoxB))
+	     return this; */
+
+
+	 var geom1_bsp = new ThreeBSP( this );
+	var geom2_bsp = new ThreeBSP( geom2 );
+	var result_bsp = geom1_bsp.subtract( geom2_bsp );
+	matl = new THREE.MeshNormalMaterial( { color: 0x000088 } );
+	var result = result_bsp.toMesh( matl );
+	 result.geometry.computeVertexNormals();
+
+	return result.geometry;
+}
+if (THREE.Geometry.prototype.merge==null) THREE.Geometry.prototype.merge= function(geom2)
+{
+	// used instead of union when the two geoms do not overlap
+	// no check is made to ensure that no-overalp condition holds
+	if (!(geom2 instanceof THREE.Geometry)){
+		swal({	title: "object error:",
+			text: "Argument of merge must be a geom object",
+			type: "error", showCancelButton: false,
+			confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+			closeOnConfirm: true
+		});
+		return;
+	}
+	
+	
+	THREE.GeometryUtils.merge(this, geom2);
+	return this;
+}
+if (THREE.Geometry.prototype.union ==null) THREE.Geometry.prototype.union = function(geom2)
+{
+	if (!(geom2 instanceof THREE.Geometry)){
+		swal({	title: "object error:",
+			text: "Argument of union must be a geom object",
+			type: "error", showCancelButton: false,
+			confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+			closeOnConfirm: true
+		});
+		return;
+	}
+	// First perform operations on bounding boxes to save on computations
+	this.computeBoundingBox();
+	geom2.computeBoundingBox();
+	var bBoxA =  this.boundingBox;
+	var bBoxB = geom2.boundingBox;
+	// Test 1: If bounding boxes do not intersect, then simply merge
+	/*if (!doBoundingBoxesOverlap(bBoxA,bBoxB)){
+	    THREE.GeometryUtils.merge(this, geom2);
+	    return this;
+	}*/
+	
+	
+	var geom1_bsp = new ThreeBSP( this );
+	var geom2_bsp = new ThreeBSP( geom2 );
+	var result_bsp = geom1_bsp.union( geom2_bsp );
+	matl = new THREE.MeshNormalMaterial( { color: 0x000088 } );
+	var result = result_bsp.toMesh( matl );
+	result.geometry.computeVertexNormals();
+	return result.geometry;
+}
+if (THREE.Shape.prototype.display==null) THREE.Shape.prototype.display = function(clr)
+{
+	if (!clr)clr = 'red';
+	wireFrameMode = true;
+	geom = new THREE.ShapeGeometry( this );
+	var mesh = new THREE.Mesh( geom, new THREE.MeshBasicMaterial( { color: clr,side:THREE.DoubleSide } ) ) ; 
+	scene.add( mesh );
+}
+if (THREE.Geometry.prototype.displayTransparent==null) THREE.Geometry.prototype.displayTransparent = function(clr)
+{
+	if (!clr)clr = 'red';
+		
+	matl = new THREE.MeshBasicMaterial( { color: clr,vertexColors: THREE.FaceColors,wireframe: true,transparent: true } );
+	mesh = new THREE.Mesh(this,matl );
+	mesh.overdraw = true;
+	scene.add(mesh);
+	this.computeBoundingBox();
+	lx = Math.max(this.boundingBox.max.x,-this.boundingBox.min.x);//max absolute distance from origin
+	ly = Math.max(this.boundingBox.max.y,-this.boundingBox.min.y);
+	lz = Math.max(this.boundingBox.max.z,-this.boundingBox.min.z);
+	lScale  = Math.max(Math.max(lx,ly),lz);
+	G_geometriesDisplayed.push(this.clone());
+	setAxisLength(1.*lScale);
+	return this;
+}
+if (THREE.Geometry.prototype.display==null) THREE.Geometry.prototype.display = function(clr)
+{
+	if (clr) {
+               clr = clr.toLowerCase();
+		matl = new THREE.MeshLambertMaterial( { color: clr,vertexColors: THREE.FaceColors} );
+         }
+	else 
+		matl = new THREE.MeshNormalMaterial( { color: 0x000088 } );
+	
+	mesh = new THREE.Mesh(this,matl );
+	mesh.overdraw = true;
+	scene.add(mesh);
+	this.computeBoundingBox();				
+	lx = Math.max(this.boundingBox.max.x,-this.boundingBox.min.x);//max absolute distance from origin
+	ly = Math.max(this.boundingBox.max.y,-this.boundingBox.min.y);
+	lz = Math.max(this.boundingBox.max.z,-this.boundingBox.min.z);
+	lScale  = Math.max(Math.max(lx,ly),lz);
+        G_geometriesDisplayed.push(this.clone());
+	setAxisLength(1.*lScale);
+	return this;
+}
+
+if (THREE.Geometry.prototype.checkSliver==null) THREE.Geometry.prototype.checkSliver= function() {
+	this.displayTransparent('black');
+	
+	var n_i,n_j;
+	var center_i,center_j;
+	var face_i,face_j;
+	
+	this.computeFaceNormals();// just to be sure
+	var ctr = 0;
+	this.computeBoundingBox();
+	var minz = this.boundingBox.min.z;
+	for(var i = 0; i < this.faces.length; i++){
+		face_i = this.faces[ i ];
+		n_i = face_i.normal;
+		center_i = getCenterOfTriangle(this,i);
+		for(var j = i+1; j < this.faces.length; j++){
+			face_j = this.faces[ j ];
+			n_j = face_j.normal;
+			center_j = getCenterOfTriangle(this,j);
+			var dotProd = n_i.x*n_j.x + n_i.y*n_j.y + n_i.z*n_j.z;
+			if (dotProd <-0.95){
+				console.log("i = " + i + "; j = " + j);
+			}
+			
+		}
+	}
+	
+	if (ctr > 0){ // need to add different errors/warnings
+	   swal({   title: "Support needed",   
+	   text: "The red surfaces will need supports. If you do not want supports or don't have material, try re-designing or rotating your object",   
+	   type: "warning",   showCancelButton: false,   
+	   confirmButtonColor: "#3399FF",   confirmButtonText: "OK",   
+	   closeOnConfirm: true }); 
+	} 
+        else {
+	   swal({	title: "All systems go!",
+	   text: "Great! your object can be printed without any additional structures!",
+	   type: "success",
+	   showCancelButton: false,
+	   confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+	   closeOnConfirm: true});
+	}
+}
+if (THREE.Geometry.prototype.checkSupport==null) THREE.Geometry.prototype.checkSupport= function() {
+	this.displayTransparent('black');
+	
+	var nz;
+	this.computeFaceNormals();// just to be sure
+	var ctr = 0;
+	this.computeBoundingBox();
+	var minz = this.boundingBox.min.z;
+	for(var i = 0; i < this.faces.length; i++){
+		var face = this.faces[ i ];
+		nz = face.normal.z;
+		if (nz < -0.5){//cutoff of 30 degrees
+			center = getCenterOfTriangle(this,i);
+			centerz = center.z;
+			if (centerz > (minz + 0.001*G_LengthScale)){
+				var geometry = new THREE.Geometry();
+				var Pi = face.a;
+				var Qi = face.b;
+				var Ri = face.c;
+				var P = new THREE.Vector3(this.vertices[Pi].x, this.vertices[Pi].y, this.vertices[Pi].z);
+				var Q = new THREE.Vector3(this.vertices[Qi].x, this.vertices[Qi].y, this.vertices[Qi].z);
+				var R = new THREE.Vector3(this.vertices[Ri].x, this.vertices[Ri].y, this.vertices[Ri].z);
+			
+				geometry.vertices.push(P);
+				geometry.vertices.push(Q);
+				geometry.vertices.push(R);
+
+				geometry.faces.push( new THREE.Face3( 0, 2, 1 ) );
+				
+				var redMat = new THREE.MeshBasicMaterial({color: 0xff0000, side: THREE.DoubleSide});
+				var triangle = new THREE.Mesh(geometry, redMat);
+				scene.add(triangle);
+				ctr++;
+			}
+		}
+	}
+	
+	if (ctr > 0){ // need to add different errors/warnings
+	   swal({   title: "Support needed",   
+	   text: "The red surfaces will need supports to print along z direction. If you do not want supports or don't have material, try re-designing or rotating your object",   
+	   type: "warning",   showCancelButton: false,   
+	   confirmButtonColor: "#3399FF",   confirmButtonText: "OK",   
+	   closeOnConfirm: true }); 
+	} 
+        else {
+	   swal({	title: "3D Printability!",
+	   text: "Great! your object can be printed along z direction without any additional structures!",
+	   type: "success",
+	   showCancelButton: false,
+	   confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+	   closeOnConfirm: true});
+	}
+}
+
+
+if (THREE.Geometry.prototype.translate==null) THREE.Geometry.prototype.translate = function(dx,dy,dz)
+{
+	dx = dx || 0;
+	dy = dy || 0;
+	dz = dz || 0;
+	m = new THREE.Matrix4();
+	m.makeTranslation(dx,dy,dz);
+	this.applyMatrix(m);
+	return this;
+}
+
+if (THREE.Geometry.prototype.translateX==null) THREE.Geometry.prototype.translateX = function(d)
+{
+	d = d || 0;
+	m = new THREE.Matrix4();
+	m.makeTranslation(d,0,0);
+	this.applyMatrix(m);
+	return this;
+}
+if (THREE.Geometry.prototype.translateY==null) THREE.Geometry.prototype.translateY = function(d)
+{
+	d = d || 0;
+	m = new THREE.Matrix4();
+	m.makeTranslation(0,d,0);
+	this.applyMatrix(m);
+	return this;
+}
+if (THREE.Geometry.prototype.translateZ==null) THREE.Geometry.prototype.translateZ = function(d)
+{
+	d = d || 0;
+	m = new THREE.Matrix4();
+	m.makeTranslation(0,0,d);
+	this.applyMatrix(m);
+	return this;
+}
+
+if (THREE.Geometry.prototype.rotateX==null) THREE.Geometry.prototype.rotateX = function(angleInDegrees)
+{
+	angleInDegrees = angleInDegrees || 0;
+	m = new THREE.Matrix4();
+	m.makeRotationX(angleInDegrees*Math.PI/180);
+	this.applyMatrix(m);
+	return this;
+}
+
+if (THREE.Geometry.prototype.rotateY==null) THREE.Geometry.prototype.rotateY = function(angleInDegrees)
+{
+	angleInDegrees = angleInDegrees || 0;
+	m = new THREE.Matrix4();
+	m.makeRotationY(angleInDegrees*Math.PI/180);
+	this.applyMatrix(m);
+	return this;
+}
+if (THREE.Geometry.prototype.rotateZ==null) THREE.Geometry.prototype.rotateZ = function(angleInDegrees)
+{
+	angleInDegrees = angleInDegrees || 0;
+	m = new THREE.Matrix4();
+	m.makeRotationZ(angleInDegrees*Math.PI/180);
+	this.applyMatrix(m);
+	return this;
+}
+if (THREE.Geometry.prototype.flipOrientation==null) THREE.Geometry.prototype.flipOrientation= function()
+{
+      for ( var i = 0; i < this.faces.length; i ++ ) {
+            var face = this.faces[ i ];
+            var temp = face.a;
+            face.a = face.c;
+            face.c = temp;
+       }
+       this.computeFaceNormals();
+       this.computeVertexNormals();
+       var faceVertexUvs = this.faceVertexUvs[ 0 ];
+       for ( var i = 0; i < faceVertexUvs.length; i ++ ) {
+           var temp = faceVertexUvs[ i ][ 0 ];
+           faceVertexUvs[ i ][ 0 ] = faceVertexUvs[ i ][ 2 ];
+           faceVertexUvs[ i ][ 2 ] = temp;
+       }
+       return this;
+}
+if (THREE.Geometry.prototype.mirrorX==null) THREE.Geometry.prototype.mirrorX = function()
+{
+       // Flip the vertices
+       for(var i = 0; i < this.vertices.length; i++)
+            this.vertices[i].x = -(this.vertices[i].x);
+
+       //we now need to flip the orientation of faces
+       this.flipOrientation();
+       return this;
+}
+if (THREE.Geometry.prototype.mirrorY==null) THREE.Geometry.prototype.mirrorY = function()
+{
+	
+       // Flip the vertices
+       for(var i = 0; i < this.vertices.length; i++)
+            this.vertices[i].y = -(this.vertices[i].y);
+
+       //we now need to flip the orientation of faces
+       this.flipOrientation();
+       return this;
+}
+if (THREE.Geometry.prototype.mirrorZ==null) THREE.Geometry.prototype.mirrorZ = function()
+{
+	
+       // Flip the vertices
+       for(var i = 0; i < this.vertices.length; i++)
+            this.vertices[i].z = -(this.vertices[i].z);
+
+       //we now need to flip the orientation of faces
+       this.flipOrientation();
+       return this;
+}
+
+if (THREE.Geometry.prototype.mirrorYZ ==null) THREE.Geometry.prototype.mirrorYZ = function()
+{
+	this.mirrorX();
+	return this;
+}
+if (THREE.Geometry.prototype.mirrorXZ==null) THREE.Geometry.prototype.mirrorXZ= function()
+{
+	this.mirrorY();
+	return this;
+}
+if (THREE.Geometry.prototype.mirrorXY==null) THREE.Geometry.prototype.mirrorXY= function()
+{
+	this.mirrorZ();
+	return this;
+}
+if (THREE.Geometry.prototype.scale==null) THREE.Geometry.prototype.scale = function(sx,sy,sz)
+{
+	sx = sx || 1;
+	sy = sy || sx;
+	sz = sz || sx;
+	m = new THREE.Matrix4();
+	m.makeScale(sx,sy,sz);
+	this.applyMatrix(m);
+	return this;
+}
+if (THREE.Geometry.prototype.translatex==null) THREE.Geometry.prototype.translatex = function(d)//lower letters
+{
+	this.translateX(d);
+	return this;
+}
+if (THREE.Geometry.prototype.translatey==null) THREE.Geometry.prototype.translatey = function(d)//lower letters
+{
+	this.translateY(d);
+	return this;
+}
+if (THREE.Geometry.prototype.translatez==null) THREE.Geometry.prototype.translatez = function(d)//lower letters
+{
+	this.translateZ(d);
+	return this;
+}
+if (THREE.Geometry.prototype.rotatex==null) THREE.Geometry.prototype.rotatex = function(angleInDegrees)//lower letters
+{
+	this.rotateX(angleInDegrees);
+	return this;
+}
+if (THREE.Geometry.prototype.rotatey==null) THREE.Geometry.prototype.rotatey = function(angleInDegrees)//lower letters
+{
+	this.rotateY(angleInDegrees);
+	return this;
+}
+if (THREE.Geometry.prototype.rotatez==null) THREE.Geometry.prototype.rotatez = function(angleInDegrees)//lower letters
+{
+	this.rotateZ(angleInDegrees);
+	return this;
+}
+if (THREE.Geometry.prototype.saveSTL==null) THREE.Geometry.prototype.saveSTL = function()
+{
+	var str = getSTLGeometryAsStr(this);
+	var blob = new Blob([str], {type: "text/plain;charset=utf-8"});
+	saveAs(blob, "STLFileSaved.stl");
+}
+if (THREE.Geometry.prototype.saveOFF==null) THREE.Geometry.prototype.saveOFF = function()
+{
+	var str = getGeometryInOFF(this);
+	var blob = new Blob([str], {type: "text/plain;charset=utf-8"});
+	saveAs(blob, "STLFileSaved.off");
+}
+
+function loadSTL()
+{
+	$('#STLInput').click();//mimic a button press
+}
+function readClientSelectedSTLFile(evt)
+{
+     console.log('Calling readClientSelectedSTLFile');
+     var f = evt.target.files[0]; 
+    if (f) {
+    	G_FileNameLoaded = f.name;
+    	G_FileNameLoaded = G_FileNameLoaded.substr(0, G_FileNameLoaded.lastIndexOf('.')); // strip extension
+	readSTLFile(evt);
+     }
+}
+function clearDisplay()
+{
+	var obj, i;	
+	G_LengthScale = 0;
+	for ( i = scene.children.length - 1; i >= 0 ; i -- ) {
+		obj = scene.children[ i ];
+		if ( (obj !== axes) && (obj != ambientLight) && (obj != directionalLight))
+			scene.remove(obj);
+	}
+	G_geometriesDisplayed = [];
+	setAxisLength(0);
+}
+function recoverLastExecutedCode()
+{
+	swal({   
+		title: "Recover Code?",   
+		text: "The code in text window will be replaced with saved code, do you want to proceed?",   
+		type: "warning",   
+		showCancelButton: true,   
+		confirmButtonColor: "#3399FF",   
+		confirmButtonText: "Replace",   
+		closeOnCancel: true,
+		closeOnConfirm: true },
+		function(){   
+			$("textarea").val(localStorage.getItem("text"));
+			editor.setValue(localStorage.getItem("text"));
+		}
+	);
+
+}
+function executeCode() {
+	clearDisplay();
+
+        var text = editor.getValue();
+	//var text = $("textarea").val();
+	//console.log("Executing " + text);
+        localStorage.setItem("text", text); // save the item
+	resetBeeper();
+	try {
+		eval(text);
+	}
+	catch(err){
+		err = String(err);
+		var error = err.split(":");
+		swal({	title: error[0],
+			text: error[1],
+			type: "error", showCancelButton: false,
+			confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+			closeOnConfirm: false
+			
+		});
+		/* Not working correctly
+		var text = $("textarea").val();
+		text = text.replace(/<br\s*[\/]?>/gi, "\n").replace(/&nbsp;/gi, " ");;
+		var lines = text.split('\n');
+		for(var i = 1;i <= lines.length;i++){
+		   if ((lines[i-1].indexOf("for") == -1) && lines[i-1].indexOf("function") == -1) {// do not report errors for function and for loop
+				try {
+					eval(lines[i-1]);
+				}
+				catch(err) {
+					var toalert = 'Line' + i + '; Error: ' + err;
+					swal({	title: "Error:",
+						text: toalert,
+						type: "error", showCancelButton: false,
+						confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+						closeOnConfirm: true
+					});
+					break;
+				}
+		    }
+		}	
+		*/	
+	}
+}
+function saveUserCode()
+{
+	var text = editor.getValue();
+	text = text.replace(/\n/gi, "\r\n");
+	var blob = new Blob([text], {type: "text/plain;charset=utf-8"});
+	saveAs(blob, "myCode.txt");
+}
+
+
+function  saveImageAsFile(){
+    var imgData, imgNode; 
+    try {
+        imgData = renderer.domElement.toDataURL();      
+        //console.log(imgData);
+        //var blob = new Blob([imgData]);
+	
+        var data = atob( imgData.substring( "data:image/png;base64,".length ) ),
+         asArray = new Uint8Array(data.length);
+
+         for( var i = 0, len = data.length; i < len; ++i ) {
+               asArray[i] = data.charCodeAt(i);    
+        }
+
+         var blob = new Blob( [ asArray.buffer ], {type: "image/png"} );
+          saveAs(blob, "myImage.png");
+    } 
+    catch(e) {
+        console.log("Browser does not support taking screenshot of 3d context");
+        return;
+    }
+   //imgNode = document.createElement("img");
+   //imgNode.src = imgData;
+   //document.body.appendChild(imgNode);
+}
+
+function randomExample(){
+	var codes=[];
+	codes.push("g = cube(60,60,100).difference(cube(50,50,110));\ng.display();// Press F5 to see result");
+	codes.push("g1 = cube(75,75,25).translate(25,25,0);\ng = cube(100,100,12.5).difference(g1);\ng.display();// Press F5 to see result");
+	codes.push("g = sphere(100).difference(cube(75,75,200));\ng.display(); // Press F5 to see result");
+	codes.push("g = cube(100).difference(sphere(60));\ng.display(); // Press F5 to see the result ");
+	codes.push("g1 = textGeom('CADjs').rotateZ(180).translate(50,10,0);\ng = cube(120,60,5).union(g1);\ng.display(); // Press F5 to see the result");
+	codes.push("arc = [-100,200,0,200,false];\ns = polyarc([ [100,0], [100,200],arc,[-100,0] ]);\ng = extrudeShape(s,20).display(); // Press F5 to see result");
+	codes.push("g = cube(1,0.25,0.25);\ng1 = g.clone();\ng1.rotateX(45);\ng1.translateY(0.5);\ng.display('red');\ng1.display('blue');// Press F5 to see result");
+	codes.push("g1 =sphere(1,64);\ng1.scale(1,0.75,0.75);\ng1.display('purple');\n g2 = cube(1.15);\ng2.display('red');// Press F5 to see result");
+	codes.push("g1 = cube(0.25,1,1);\ng = g1.clone(); \nfor (i = 0;i < 9;i++) {\ng1.rotateX(10);// 10 degrees each time\ng = g.union(g1);\n}\ng.display();// Press F5 to see result");
+	
+	var randomIndex = Math.floor(Math.random() * codes.length);
+	var displayCode = codes[randomIndex];
+	$("textarea").val(displayCode);
+}
+function init() 
+{
+	// Check for the various File API support.
+	if (window.File && window.FileReader && window.FileList && window.Blob) {
+		// All the File APIs are supported.
+	} else {
+		swal({	title: "File API support:",
+			text: "The File APIs are not fully supported in this browser",
+			type: "warning", showCancelButton: false,
+			confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+			closeOnConfirm: true
+		});
+	}
+	scene = new THREE.Scene();
+
+	var SCREEN_WIDTH = window.innerWidth, SCREEN_HEIGHT = window.innerHeight;
+	var VIEW_ANGLE = 40, ASPECT = 0.6*SCREEN_WIDTH / (SCREEN_HEIGHT), NEAR = 0.01, FAR = 200000;
+	camera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR);
+	camera.up.set( 0, 0, 1 );
+	
+	if ( Detector.webgl )
+		renderer = new THREE.WebGLRenderer( {antialias:true,preserveDrawingBuffer: true } );
+	else
+		renderer = new THREE.CanvasRenderer(); 
+	renderer.setSize(0.6*SCREEN_WIDTH, SCREEN_HEIGHT);
+	renderer.setClearColor( 0xffffff, 1 );
+	container = document.getElementById( 'ThreeJS' );
+	container.appendChild( renderer.domElement );
+	
+        
+	THREEx.WindowResize(renderer, camera);
+	controls = new THREE.OrbitControls( camera, renderer.domElement );
+	
+	G_LengthScale = 0.0;
+
+    	// add subtle ambient lighting
+    	ambientLight = new THREE.AmbientLight(0x000044);
+    	scene.add(ambientLight);
+      
+    	// directional lighting
+    	directionalLight = new THREE.DirectionalLight(0xffffff);
+    	directionalLight.position.set(0.6, 1., 1.0).normalize();
+    	scene.add(directionalLight);
+    	
+        randomExample();
+        setAxisLength(0);
+
+
+	enableTab("mytextarea");
+	
+	shortcut.add("F1", function() {
+		saveUserCode();
+	});
+	shortcut.add("F2", function() {
+	   $('#CodeInput').click();
+	    
+	});
+
+        shortcut.add("F3", function() {
+	   saveImageAsFile();
+	    
+	});
+	shortcut.add("F4", function() {
+		clearDisplay();
+	});
+	shortcut.add("F5", function() {
+	    clearDisplay();
+		executeCode();
+	});
+	
+	loader.addEventListener( 'load', function ( event ) {
+		var  nTriangles = event.content.faces.length;
+                
+		if (nTriangles <=0) {
+			swal({	title: "Load error:",
+				text: "File being loaded does not appear to be an STL file",
+				type: "warning", showCancelButton: false,
+				confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+				closeOnConfirm: true
+			});
+			return;
+		}
+                console.log("STL with " + nTriangles + " triangles read");
+		
+		window[G_FileNameLoaded] = event.content;
+		swal({	title: "STL Loaded",
+				text: "Geometry object with name " + G_FileNameLoaded + " has been created\nYou can display or operate on it.\n Ex: " +   G_FileNameLoaded + ".display();\n" + G_FileNameLoaded + ".rotateX(90); ",
+				type: "info", showCancelButton: false,
+				confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+				closeOnConfirm: true
+			});  
+                //window[G_FileNameLoaded].display();
+                G_FilesLoaded[G_nFilesLoaded] = G_FileNameLoaded;
+                G_nFilesLoaded++;
+                
+		return G_FileNameLoaded;
+	} );
+	
+	var gui = new dat.GUI( { width: 200} );;
+	
+	parameters = {
+		clear: function() { clearDisplay();	},
+		compileCode: function() {
+			executeCode();
+		},
+		saveCode: function() { 
+			saveUserCode();
+		},
+                saveImage: function() {
+                        saveImageAsFile();
+                },
+		loadCode: function() { 
+			$('#CodeInput').click();
+		},  
+                recoverCode: function() { 
+			recoverLastExecutedCode();
+		},
+		stlinfoCode: function() { 
+			nGeometriesDisplay = G_geometriesDisplayed.length;
+			if (nGeometriesDisplay  == 0){
+                           swal({	title: "Error:",
+						text: "No geometry is displayed; cannot execute STLInfo",
+						type: "error", showCancelButton: false,
+						confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+						closeOnConfirm: true
+					});
+                         }
+			else if (nGeometriesDisplay > 1){
+                              swal({	title: "Error:",
+						text: "More than one geometry is displayed; cannot execute STLInfo",
+						type: "error", showCancelButton: false,
+						confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+						closeOnConfirm: true
+					});
+                        }
+			else
+			   G_geometriesDisplayed[0].info();
+		},
+        savestlCode: function() { 
+			swal({	title: "Info:",
+		text: "It is highly recommended that you clean the stl file after saving using, for example, the Microsoft 3D repair service at https://modelrepair.azurewebsites.net/",
+		type: "info", showCancelButton: false,
+		confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+		closeOnConfirm: false
+	});
+			nGeometriesDisplay = G_geometriesDisplayed.length;
+			if (nGeometriesDisplay  == 0){
+                           swal({	title: "Error:",
+						text: "No geometry is displayed; cannot execute SaveSTL",
+						type: "error", showCancelButton: false,
+						confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+						closeOnConfirm: true
+					});
+                         }
+			else if (nGeometriesDisplay > 1){
+                              swal({	title: "Error:",
+						text: "More than one geometry is displayed; cannot execute SaveSTL",
+						type: "error", showCancelButton: false,
+						confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+						closeOnConfirm: true
+					});
+                        }
+			else
+			   G_geometriesDisplayed[0].saveSTL();
+		},
+		checkSupportCode: function() { 
+			nGeometriesDisplay = G_geometriesDisplayed.length;
+			if (nGeometriesDisplay  == 0){
+                           swal({	title: "Error:",
+						text: "No geometry is displayed; cannot execute SaveSTL",
+						type: "error", showCancelButton: false,
+						confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+						closeOnConfirm: true
+					});
+                         }
+			else if (nGeometriesDisplay > 1){
+                              swal({	title: "Error:",
+						text: "More than one geometry is displayed; cannot execute SaveSTL",
+						type: "error", showCancelButton: false,
+						confirmButtonColor: "#3399FF", confirmButtonText: "OK",
+						closeOnConfirm: true
+					});
+                        }
+			else
+			   G_geometriesDisplayed[0].checkSupport();
+		},
+ 
+		axes: true,
+		smoothness: 16,
+		loadSTL: function() { 
+			$('#STLInput').click();
+		},
+		};
+	gui.add( parameters, 'saveCode' ).name("SaveCode");
+        gui.add( parameters, 'loadCode' ).name("LoadCode");
+        gui.add( parameters, 'clear' ).name('ClearScreen');
+	gui.add( parameters, 'compileCode' ).name("ExecuteCode");
+	gui.add( parameters, 'recoverCode' ).name("RecoverCode");
+	gui.add( parameters, 'stlinfoCode' ).name("STLinfo");
+        gui.add( parameters, 'savestlCode' ).name("SaveSTL");
+        gui.add( parameters, 'checkSupportCode' ).name("CheckSupport");
+	gui.add( parameters, 'axes').listen().onChange(function(newValue){if(newValue) {axesOn();}else {axesOff();}}).name("Axes");
+        var controller = gui.add( parameters, 'smoothness' ).min(3).max(64).step(1).name("Smoothness");
+
+
+        controller.onChange(function(newValue){G_Segments = newValue;});
+        gui.add( parameters, 'loadSTL' ).name("loadSTL");
+	gui.close();
+
+
+}
+function require(script) {
+    $.ajax({
+        url: script,
+        dataType: "script",
+        success: function (data) {
+            console.log('Function loaded \n' + data);
+        },
+        error: function () {
+            throw new Error("Could not load script " + script);
+        }
+    });
+}
+function readCodeFile(f) 
+{
+	console.log('Calling readCodeFile');
+    if (f) {
+		var reader = new FileReader();
+		reader.onload = function(e) {
+			console.log('Reading code file ... ');
+			var data  = reader.result;
+			//data = data.replace(/(?:\r\n|\r|\n)/g, '<br />');
+                        console.log(data);
+			$('#mytextarea').val(data);
+                        editor.setValue(data);
+			clearDisplay();
+		}
+		reader.readAsText(f);
+    }
+}
+function readClientCodeFile(evt)
+{
+    var f = evt.target.files[0]; 
+    if (f) 
+		readCodeFile(f);
+}
+function animate() 
+{
+    requestAnimationFrame( animate );
+	render();		
+	update();
+}
+function update()
+{
+	if ( keyboard.pressed("z") ) { 
+		// do something
+	}
+	controls.update();
+}
+function render() 
+{
+	renderer.render( scene, camera );
+}
+function addScript(scriptFile)
+{
+	var s = document.createElement('script');
+	s.setAttribute('src',"///" + scriptFile);
+	document.head.appendChild(s);
+}
+document.getElementById('STLInput').addEventListener('change', readClientSelectedSTLFile, false);
+document.getElementById('CodeInput').addEventListener('change', readClientCodeFile, false);
+</script>
+</body>
+</html>

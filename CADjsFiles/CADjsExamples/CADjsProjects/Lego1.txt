@@ -1,0 +1,13 @@
+g1 = cube(20,8,5);
+g2 = cube(18,6,3).translateY(-1.1);
+g3 = g1.difference(g2);
+g4= cylinder(1,8).translateX(4);
+g5= cylinder(1,8).translateX(-4);
+g6= cylinder(2,2,24).translate(7,4,0);
+g7=g6.clone();
+g=g3.union(g4).union(g5).union(g6);
+for(i=1;i<=2;i++) {
+   g7.translateX(-7);
+   g=g.union(g7);
+}
+g.display();

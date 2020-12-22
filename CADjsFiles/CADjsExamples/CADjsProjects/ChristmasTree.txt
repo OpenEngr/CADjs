@@ -1,0 +1,10 @@
+g1 = cylinder(1,5);//tree trunk along y axis
+g1.translateY(-2);//shift down
+
+g1.display();
+for(var i = 1; i<=5; i++){
+  g2 = cone(10-i,0.1,10);
+  g2.translateY(5*i);
+  g2.display();
+}
+// Note that the geoms are NOT unioned

@@ -1,0 +1,4 @@
+radius = 0.6;
+nSeg = 16;//sphere quality
+g1 = sphere(radius,nSeg);
+g1.display();
